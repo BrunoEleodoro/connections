@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3001;
 app.use(express.json());
 
 // Serve frontend as static files
-app.use(express.static(path.resolve(__dirname, '../frontend')));
+app.use(express.static(path.resolve(__dirname, 'frontend')));
 
 app.use(cors());
 
@@ -52,7 +52,7 @@ app.post('/api/chat', async (req, res) => {
 
 // Fallback: serve index.html for any unknown route (SPA support)
 app.use(/(.*)/, (req, res) => {
-  res.sendFile(path.resolve(__dirname, '../frontend/index.html'));
+  res.sendFile(path.resolve(__dirname, 'frontend/index.html'));
 });
 
 app.listen(PORT, () => {
