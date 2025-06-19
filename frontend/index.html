@@ -336,6 +336,30 @@
         <button type="submit" class="px-4 py-2 rounded bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold hover:from-blue-600 hover:to-purple-600">Send</button>
       </form>
     </div>
+    <!-- Kanban Board Modal -->
+    <div id="kanban-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
+      <div class="glass w-screen h-screen flex flex-col animate-scale-in relative p-0">
+        <button id="kanban-close-btn" class="absolute top-6 right-8 text-white/80 hover:text-white text-3xl z-10">&times;</button>
+        <h2 id="kanban-title" class="text-3xl font-semibold mb-4 mt-8 ml-8">Leads Board</h2>
+        <div id="kanban-board" class="flex gap-6 overflow-x-auto flex-1 px-8 pb-8"></div>
+      </div>
+    </div>
+    <!-- Export Modal -->
+    <div id="export-modal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 hidden">
+      <div class="glass rounded-lg p-6 w-11/12 max-w-lg animate-scale-in relative">
+        <button id="export-close-btn" class="absolute top-3 right-3 text-white/80 hover:text-white text-2xl">&times;</button>
+        <h2 id="export-title" class="text-2xl font-semibold mb-4">Export Contacts</h2>
+        <div class="mb-4">
+          <label for="export-date" class="block text-white/70 mb-1">Select date</label>
+          <input type="date" id="export-date" class="w-full p-2 rounded bg-white/10 border border-white/20 text-white" />
+        </div>
+        <div class="mb-4">
+          <button id="copy-text-btn" class="px-4 py-2 rounded bg-blue-600 text-white font-semibold mr-2 mb-2">Copy as Text</button>
+          <button id="copy-csv-btn" class="px-4 py-2 rounded bg-green-600 text-white font-semibold mb-2">Copy as CSV</button>
+        </div>
+        <div id="export-preview" class="bg-white/10 rounded p-3 text-white text-sm max-h-40 overflow-y-auto"></div>
+      </div>
+    </div>
 </body>
 
 </html>

@@ -129,30 +129,51 @@ domReady(function () {
                 const header = document.createElement("div");
                 header.className = "flex items-center gap-2 mb-2 justify-between";
                 header.innerHTML = `<span class='font-semibold text-lg'>${event.name}</span>`;
-                // Robot icon/button
-                const agentBtn = document.createElement('button');
-                agentBtn.className = 'flex items-center gap-1 px-2 py-1 rounded bg-gradient-to-r from-slate-700 to-slate-900 text-white text-xs hover:from-slate-800 hover:to-slate-900';
-                agentBtn.innerHTML = `<svg xmlns='http://www.w3.org/2000/svg' class='w-4 h-4 inline' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 2a7 7 0 017 7v2a7 7 0 01-7 7 7 7 0 01-7-7V9a7 7 0 017-7zm0 0v2m0 16v2m-7-7h2m10 0h2' /></svg> Talk with Agent`;
-                agentBtn.onclick = () => openChatOverlay(event);
-                header.appendChild(agentBtn);
-                // Delete event button
-                const deleteEventBtn = document.createElement('button');
-                deleteEventBtn.className = 'ml-2 px-2 py-1 rounded bg-red-600/80 text-white text-xs hover:bg-red-700';
-                deleteEventBtn.innerHTML = `<svg xmlns='http://www.w3.org/2000/svg' class='w-4 h-4 inline' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 18L18 6M6 6l12 12' /></svg>`;
-                deleteEventBtn.onclick = () => {
-                    if (confirm(`Delete event '${event.name}'? This cannot be undone.`)) {
-                        eventsData.splice(eventIdx, 1);
-                        saveEvents(eventsData);
-                        renderEvents();
-                        showToast('Event deleted!');
-                    }
+                // 3-dot menu (kebab)
+                const menuWrapper = document.createElement('div');
+                menuWrapper.className = 'relative';
+                const menuBtn = document.createElement('button');
+                menuBtn.className = 'ml-2 px-2 py-1 rounded hover:bg-white/10 text-white text-xl';
+                menuBtn.innerHTML = '&#8942;'; // vertical ellipsis
+                menuWrapper.appendChild(menuBtn);
+                // Dropdown menu
+                const dropdown = document.createElement('div');
+                dropdown.className = 'absolute right-0 mt-2 w-44 bg-white rounded shadow-lg z-50 hidden';
+                dropdown.innerHTML = `
+                  <button class="block w-full text-left px-4 py-2 text-gray-800 hover:bg-blue-100" data-action="agent">Talk with Agent</button>
+                  <button class="block w-full text-left px-4 py-2 text-gray-800 hover:bg-blue-100" data-action="board">Leads Board</button>
+                  <button class="block w-full text-left px-4 py-2 text-gray-800 hover:bg-blue-100" data-action="export">Export</button>
+                `;
+                menuWrapper.appendChild(dropdown);
+                header.appendChild(menuWrapper);
+                // Menu logic
+                menuBtn.onclick = (e) => {
+                  e.stopPropagation();
+                  // Close any other open menus
+                  document.querySelectorAll('.event-menu-dropdown').forEach(el => el.classList.add('hidden'));
+                  dropdown.classList.toggle('hidden');
                 };
-                header.appendChild(deleteEventBtn);
+                dropdown.classList.add('event-menu-dropdown');
+                // Dropdown actions
+                dropdown.onclick = (e) => {
+                  e.stopPropagation();
+                  const action = e.target.getAttribute('data-action');
+                  dropdown.classList.add('hidden');
+                  if (action === 'agent') openChatOverlay(event);
+                  if (action === 'board') openLeadsBoard(event);
+                  if (action === 'export') openExportModal(event);
+                };
+                // Close menu on outside click
+                document.addEventListener('click', () => {
+                  dropdown.classList.add('hidden');
+                });
                 card.appendChild(header);
                 if (event.connections.length) {
                     const connList = document.createElement("ul");
                     connList.className = "space-y-2";
                     event.connections.forEach((conn, connIdx) => {
+                        // Ensure status field exists
+                        if (!conn.status) conn.status = 'New';
                         const li = document.createElement("li");
                         li.className = "flex items-center gap-3 bg-white/5 rounded p-2 cursor-pointer hover:bg-white/10 transition";
                         // Avatar
@@ -519,6 +540,138 @@ domReady(function () {
             url = `https://t.me/${target}?text=${encodeURIComponent(blurb)}`;
             window.open(url, "_blank");
         }
+    }
+
+    // --- Export Modal ---
+    const exportModal = document.getElementById('export-modal');
+    const exportCloseBtn = document.getElementById('export-close-btn');
+    const exportTitle = document.getElementById('export-title');
+    const exportDate = document.getElementById('export-date');
+    const copyTextBtn = document.getElementById('copy-text-btn');
+    const copyCsvBtn = document.getElementById('copy-csv-btn');
+    const exportPreview = document.getElementById('export-preview');
+    let exportModalEvent = null;
+    let exportText = '';
+    let exportCSV = '';
+
+    function openExportModal(event) {
+        exportModalEvent = event;
+        if (!exportModal || !exportTitle || !exportDate || !exportPreview) return;
+        exportTitle.textContent = `Export Contacts - ${event.name}`;
+        // Default to today
+        const today = new Date();
+        exportDate.value = today.toISOString().slice(0, 10);
+        updateExportPreview();
+        exportModal.style.display = 'flex';
+    }
+    if (exportCloseBtn) exportCloseBtn.onclick = () => {
+        if (exportModal) exportModal.style.display = 'none';
+    };
+    if (exportDate) exportDate.onchange = updateExportPreview;
+    if (copyTextBtn) copyTextBtn.onclick = () => {
+        if (exportText) {
+            navigator.clipboard.writeText(exportText);
+            showToast('Copied as text!');
+        }
+    };
+    if (copyCsvBtn) copyCsvBtn.onclick = () => {
+        if (exportCSV) {
+            navigator.clipboard.writeText(exportCSV);
+            showToast('Copied as CSV!');
+        }
+    };
+    function updateExportPreview() {
+        if (!exportModalEvent || !exportDate || !exportPreview) return;
+        const dateStr = exportDate.value;
+        const filtered = exportModalEvent.connections.filter(conn => {
+            const d = new Date(conn.timestamp);
+            return d.toISOString().slice(0, 10) === dateStr;
+        });
+        exportText = filtered.map(conn => `@${extractUsername(conn.userLink) || conn.userLink} - ${conn.notes || ''}`).join('\n');
+        exportCSV = 'Username,Notes,Date,Status\n' + filtered.map(conn => {
+            const username = extractUsername(conn.userLink) || conn.userLink;
+            const notes = (conn.notes || '').replace(/"/g, '""');
+            const date = new Date(conn.timestamp).toLocaleDateString();
+            const status = conn.status || 'New';
+            return `"@${username}","${notes}","${date}","${status}"`;
+        }).join('\n');
+        exportPreview.textContent = exportText || 'No contacts for this date.';
+    }
+
+    // --- Leads Board Modal ---
+    const kanbanModal = document.getElementById('kanban-modal');
+    const kanbanCloseBtn = document.getElementById('kanban-close-btn');
+    const kanbanTitle = document.getElementById('kanban-title');
+    const kanbanBoard = document.getElementById('kanban-board');
+    const KANBAN_STATUSES = ['New', 'Contacted', 'Interested', 'Converted'];
+
+    function openLeadsBoard(event) {
+        if (!kanbanModal || !kanbanBoard || !kanbanTitle) return;
+        kanbanTitle.textContent = `Leads Board - ${event.name}`;
+        renderKanbanBoard(event);
+        kanbanModal.style.display = 'flex';
+    }
+    if (kanbanCloseBtn) kanbanCloseBtn.onclick = () => {
+        if (kanbanModal) kanbanModal.style.display = 'none';
+    };
+
+    function renderKanbanBoard(event) {
+        kanbanBoard.innerHTML = '';
+        // For each status, create a column
+        KANBAN_STATUSES.forEach(status => {
+            const col = document.createElement('div');
+            col.className = 'flex-1 min-w-[260px] bg-white/10 rounded-lg p-3 flex flex-col gap-3';
+            col.dataset.status = status;
+            // Column header
+            const header = document.createElement('div');
+            header.className = 'font-bold text-white mb-2';
+            header.textContent = status;
+            col.appendChild(header);
+            // Cards
+            const cards = event.connections.filter(c => c.status === status);
+            cards.forEach((conn, idx) => {
+                const card = document.createElement('div');
+                card.className = 'bg-white/80 text-gray-900 rounded p-3 shadow cursor-pointer relative';
+                card.innerHTML = `
+                  <div class="font-semibold text-base truncate">@${extractUsername(conn.userLink) || conn.userLink}</div>
+                  <div class="text-xs text-gray-600 mb-1">${new Date(conn.timestamp).toLocaleDateString()}</div>
+                  <div class="text-sm text-gray-800 truncate">${conn.notes ? conn.notes.substring(0, 60) : ''}</div>
+                `;
+                // Click-to-move popover
+                card.onclick = (e) => {
+                    e.stopPropagation();
+                    // Remove any other open popovers
+                    document.querySelectorAll('.kanban-move-popover').forEach(el => el.remove());
+                    // Build popover
+                    const popover = document.createElement('div');
+                    popover.className = 'kanban-move-popover absolute top-10 right-4 bg-white rounded shadow-lg z-50 p-2';
+                    popover.style.minWidth = '160px';
+                    popover.innerHTML = `<div class='text-xs text-gray-700 mb-2'>Move to:</div>`;
+                    KANBAN_STATUSES.filter(s => s !== status).forEach(targetStatus => {
+                        const btn = document.createElement('button');
+                        btn.className = 'block w-full text-left px-3 py-2 text-gray-800 hover:bg-blue-100 rounded';
+                        btn.textContent = targetStatus;
+                        btn.onclick = (ev) => {
+                            ev.stopPropagation();
+                            conn.status = targetStatus;
+                            saveEvents(eventsData);
+                            renderKanbanBoard(event);
+                        };
+                        popover.appendChild(btn);
+                    });
+                    // Close popover on outside click
+                    setTimeout(() => {
+                        document.addEventListener('click', closePopover, { once: true });
+                    }, 0);
+                    function closePopover() {
+                        popover.remove();
+                    }
+                    card.appendChild(popover);
+                };
+                col.appendChild(card);
+            });
+            kanbanBoard.appendChild(col);
+        });
     }
 
     // --- Show user's own QR code in the UI ---
