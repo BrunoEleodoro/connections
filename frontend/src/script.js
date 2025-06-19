@@ -133,7 +133,7 @@ domReady(function () {
                 const agentBtn = document.createElement('button');
                 agentBtn.className = 'flex items-center gap-1 px-2 py-1 rounded bg-gradient-to-r from-slate-700 to-slate-900 text-white text-xs hover:from-slate-800 hover:to-slate-900';
                 agentBtn.innerHTML = `<svg xmlns='http://www.w3.org/2000/svg' class='w-4 h-4 inline' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 2a7 7 0 017 7v2a7 7 0 01-7 7 7 7 0 01-7-7V9a7 7 0 017-7zm0 0v2m0 16v2m-7-7h2m10 0h2' /></svg> Talk with Agent`;
-                agentBtn.onclick = () => showToast('Agent chat coming soon!');
+                agentBtn.onclick = () => openChatOverlay(event);
                 header.appendChild(agentBtn);
                 // Delete event button
                 const deleteEventBtn = document.createElement('button');
@@ -555,5 +555,108 @@ domReady(function () {
         document.body.appendChild(script);
     } else {
         showOwnQRCode();
+    }
+
+    // --- Chat with AI Modal ---
+    const chatOverlay = document.getElementById('chat-overlay');
+    const chatBackBtn = document.getElementById('chat-back-btn');
+    const chatMessages = document.getElementById('chat-messages');
+    const chatForm = document.getElementById('chat-form');
+    const chatInput = document.getElementById('chat-input');
+    let currentChatEventId = null;
+
+    function openChatOverlay(event) {
+        currentChatEventId = event.id;
+        // Hide main UI
+        document.body.querySelectorAll('.container, #qr-section').forEach(el => el.style.display = 'none');
+        if (chatOverlay) chatOverlay.classList.remove('hidden');
+        // Load chat history for this event
+        loadChatHistory(event.id);
+        // Initial greeting if no history
+        if (!getChatHistory(event.id).length) {
+            addChatMessage('ai', 'Hi! I am your event assistant. Ask me anything about your contacts for this event.');
+        }
+    }
+    function closeChatOverlay() {
+        if (chatOverlay) chatOverlay.classList.add('hidden');
+        document.body.querySelectorAll('.container, #qr-section').forEach(el => el.style.display = '');
+        currentChatEventId = null;
+    }
+    if (chatBackBtn) chatBackBtn.onclick = closeChatOverlay;
+
+    function getChatHistory(eventId) {
+        try {
+            return JSON.parse(localStorage.getItem('chatHistory_' + eventId) || '[]');
+        } catch { return []; }
+    }
+    function saveChatHistory(eventId, history) {
+        localStorage.setItem('chatHistory_' + eventId, JSON.stringify(history));
+    }
+    function loadChatHistory(eventId) {
+        if (!chatMessages) return;
+        chatMessages.innerHTML = '';
+        const history = getChatHistory(eventId);
+        history.forEach(msg => addChatMessage(msg.sender, msg.text));
+    }
+    function addChatMessage(sender, text) {
+        if (!chatMessages) return;
+        const msgDiv = document.createElement('div');
+        msgDiv.className = sender === 'user'
+            ? 'self-end bg-blue-600 text-white rounded-lg px-4 py-2 max-w-[80%] text-right'
+            : 'self-start bg-white/20 text-white rounded-lg px-4 py-2 max-w-[80%]';
+        msgDiv.textContent = text;
+        chatMessages.appendChild(msgDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        // Save to history
+        if (currentChatEventId) {
+            const history = getChatHistory(currentChatEventId);
+            history.push({ sender, text });
+            saveChatHistory(currentChatEventId, history);
+        }
+    }
+    function setChatLoading(loading) {
+        if (!chatMessages) return;
+        let loadingDiv = chatMessages.querySelector('.chat-loading');
+        if (loading) {
+            if (!loadingDiv) {
+                loadingDiv = document.createElement('div');
+                loadingDiv.className = 'chat-loading self-start text-white/70 px-2 py-1';
+                loadingDiv.textContent = 'AI is typing...';
+                chatMessages.appendChild(loadingDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+        } else if (loadingDiv) {
+            loadingDiv.remove();
+        }
+    }
+    if (chatForm) {
+        chatForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const userMsg = chatInput.value.trim();
+            if (!userMsg || !currentChatEventId) return;
+            addChatMessage('user', userMsg);
+            chatInput.value = '';
+            setChatLoading(true);
+            // Get contacts for this event
+            const event = eventsData.find(ev => ev.id === currentChatEventId);
+            const chatContacts = (event && event.connections) ? event.connections : [];
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: userMsg, contacts: chatContacts })
+                });
+                const data = await res.json();
+                setChatLoading(false);
+                if (data.aiMessage) {
+                    addChatMessage('ai', data.aiMessage);
+                } else {
+                    addChatMessage('ai', 'Sorry, I could not get a response.');
+                }
+            } catch (err) {
+                setChatLoading(false);
+                addChatMessage('ai', 'Error connecting to AI.');
+            }
+        };
     }
 });
