@@ -18,6 +18,11 @@ domReady(function () {
     const scannedValueEl = document.getElementById("scanned-value");
     const notesArea = document.getElementById("notes-area");
     const saveBtn = document.getElementById("save-btn");
+    const userInfoEl = document.getElementById("user-info");
+    const appBar = document.getElementById("app-bar");
+    const userPhotoEl = document.getElementById("user-photo");
+    const userNameEl = document.getElementById("user-name");
+    const userUsernameEl = document.getElementById("user-username");
 
     let html5QrCode = null;
 
@@ -108,5 +113,26 @@ domReady(function () {
 
         // Hide the native connect button when running inside Telegram.
         connectBtn.style.display = "none";
+
+        // Display connected user information on the homepage.
+        const tgUser = Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user;
+        if (tgUser) {
+            // Show app bar
+            if (appBar) appBar.style.display = "flex";
+
+            // Populate name and username
+            const fullName = `${tgUser.first_name || ""}${tgUser.last_name ? " " + tgUser.last_name : ""}`.trim();
+            if (userNameEl) userNameEl.textContent = fullName || tgUser.username || "Telegram User";
+            if (userUsernameEl) userUsernameEl.textContent = tgUser.username ? `@${tgUser.username}` : "";
+
+            // Populate photo if available
+            if (tgUser.photo_url && userPhotoEl) {
+                userPhotoEl.src = tgUser.photo_url;
+                userPhotoEl.classList.remove("hidden");
+            }
+
+            // Hide old paragraph if present
+            if (userInfoEl) userInfoEl.style.display = "none";
+        }
     }
 });
