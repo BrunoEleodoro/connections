@@ -101,8 +101,6 @@ Pull requests and suggestions are welcome! For major changes, please open an iss
 
 ## License
 
-This project is for hackathon/demo purposes. Add your license here.
+This project is for hackathon/demo purposes.
 
 ---
-
-**Happy hacking!** 
