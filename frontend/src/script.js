@@ -10,231 +10,185 @@ function domReady(fn) {
 }
 
 domReady(function () {
+    // --- DOM References ---
+    // Telegram Header
+    const tgUserHeader = document.getElementById("tg-user-header");
+    const tgAvatar = document.getElementById("tg-avatar");
+    const tgFullname = document.getElementById("tg-fullname");
+    const tgUsername = document.getElementById("tg-username");
+    const openConfigBtn = document.getElementById("open-config-btn");
 
-    // Reference UI elements
-    const connectBtn = document.getElementById("connect-btn");
-    const scannerSection = document.getElementById("scanner-section");
-    const resultSection = document.getElementById("result-section");
-    const scannedValueEl = document.getElementById("scanned-value");
-    const notesArea = document.getElementById("notes-area");
-    const saveBtn = document.getElementById("save-btn");
-    const userInfoEl = document.getElementById("user-info");
-    const appBar = document.getElementById("app-bar");
-    const userPhotoEl = document.getElementById("user-photo");
-    const userNameEl = document.getElementById("user-name");
-    const userUsernameEl = document.getElementById("user-username");
-
-    let html5QrCode = null;
-
-    // Handler for successful scan
-    function onScanSuccess(decodeText, decodeResult) {
-        // Stop the scanner and switch to result view
-        if (html5QrCode) {
-            html5QrCode.stop().then(() => {
-                html5QrCode.clear();
-            }).catch(console.error);
-        }
-
-        scannerSection.style.display = "none";
-        scannedValueEl.textContent = "Scanned: " + decodeText;
-        resultSection.style.display = "block";
-    }
-
-    // Start the QR scanner
-    function startScanner() {
-        // Avoid initializing multiple times
-        if (window.__scannerStarted) return;
-        window.__scannerStarted = true;
-
-        html5QrCode = new Html5Qrcode("my-qr-reader");
-        const config = { fps: 10, qrbox: 250, rememberLastUsedCamera: true };
-        html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
-            .catch(err => {
-                console.error("QR start error", err);
-            });
-    }
-
-    // Show scanner when the user clicks "Connect"
-    connectBtn.addEventListener("click", () => {
-        if (window.Telegram && Telegram.WebApp) {
-            Telegram.WebApp.MainButton.hide();
-        }
-
-        connectBtn.style.display = "none";
-        scannerSection.style.display = "block";
-        startScanner();
-    });
-
-    // Save button handler
-    saveBtn.addEventListener("click", () => {
-        const notes = notesArea.value.trim();
-        const scannedText = scannedValueEl.textContent.replace("Scanned: ", "");
-
-        // Save connection to selected event
-        const selectedEventId = eventSelectEl.value;
-        if (!selectedEventId) {
-            alert("Please create an event first and select it.");
-            return;
-        }
-
-        const selectedEvent = eventsData.find(ev => ev.id === selectedEventId);
-        if (!selectedEvent) {
-            alert("Selected event not found.");
-            return;
-        }
-
-        selectedEvent.connections.push({ userLink: scannedText, notes, timestamp: Date.now() });
-        saveEvents(eventsData);
-        renderEvents();
-
-        // Reset UI to homepage state
-        resultSection.style.display = "none";
-        if (!(window.Telegram && Telegram.WebApp)) {
-            connectBtn.style.display = "block";
-        }
-
-        if (window.Telegram && Telegram.WebApp) {
-            Telegram.WebApp.MainButton.show();
-        }
-
-        notesArea.value = "";
-        window.__scannerStarted = false;
-        html5QrCode = null;
-    });
-
-    /* ------------------------------------------------------------------
-       Telegram Web App integration
-       ------------------------------------------------------------------ */
-    if (window.Telegram && Telegram.WebApp) {
-        // Inform Telegram that the Web App is ready.
-        Telegram.WebApp.ready();
-
-        // Apply the current Telegram color scheme to our CSS variables.
-        function applyTelegramTheme() {
-            const isDark = Telegram.WebApp.colorScheme === "dark";
-            document.documentElement.classList.toggle("dark", isDark);
-        }
-
-        applyTelegramTheme();
-        Telegram.WebApp.onEvent("themeChanged", applyTelegramTheme);
-
-        // Configure the main Telegram button to mimic the "Connect" button.
-        Telegram.WebApp.MainButton.setParams({ text: "Connect" });
-        Telegram.WebApp.MainButton.onClick(() => connectBtn.click());
-        Telegram.WebApp.MainButton.show();
-
-        // Hide the native connect button when running inside Telegram.
-        connectBtn.style.display = "none";
-
-        // Display connected user information on the homepage.
-        const tgUser = Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user;
-        if (tgUser) {
-            // Show app bar
-            if (appBar) appBar.style.display = "flex";
-
-            // Populate name and username
-            const fullName = `${tgUser.first_name || ""}${tgUser.last_name ? " " + tgUser.last_name : ""}`.trim();
-            if (userNameEl) userNameEl.textContent = fullName || tgUser.username || "Telegram User";
-            if (userUsernameEl) userUsernameEl.textContent = tgUser.username ? `@${tgUser.username}` : "";
-
-            // Populate photo if available
-            if (tgUser.photo_url && userPhotoEl) {
-                userPhotoEl.src = tgUser.photo_url;
-                userPhotoEl.classList.remove("hidden");
-            }
-
-            // Hide old paragraph if present
-            if (userInfoEl) userInfoEl.style.display = "none";
-        }
-    }
-
-    /* ------------------------------------------------------------------
-       Events & Connections storage helpers
-    ------------------------------------------------------------------ */
-    const STORAGE_KEY_EVENTS = "eventsData";
-
-    function loadEvents() {
-        try {
-            const data = JSON.parse(localStorage.getItem(STORAGE_KEY_EVENTS) || "[]");
-            return Array.isArray(data) ? data : [];
-        } catch (e) {
-            console.error("Failed to parse events from storage", e);
-            return [];
-        }
-    }
-
-    function saveEvents(events) {
-        localStorage.setItem(STORAGE_KEY_EVENTS, JSON.stringify(events));
-    }
-
-    let eventsData = loadEvents();
-
-    /* ------------------------------------------------------------------
-       DOM references for Events UI
-    ------------------------------------------------------------------ */
+    // Main Sections
     const eventsListEl = document.getElementById("events-list");
     const addEventBtn = document.getElementById("add-event-btn");
     const addEventModal = document.getElementById("add-event-modal");
     const newEventNameInput = document.getElementById("new-event-name");
     const addEventSaveBtn = document.getElementById("add-event-save-btn");
     const cancelAddEventBtn = document.getElementById("cancel-add-event");
+    const eventError = document.getElementById("event-error");
     const eventSelectEl = document.getElementById("event-select");
 
-    /* ------------------------------------------------------------------
-       Rendering helpers
-    ------------------------------------------------------------------ */
-    function renderEvents() {
-        // Update list on homepage
-        if (!eventsListEl) return;
-        eventsListEl.innerHTML = "";
+    // QR Section
+    const qrSection = document.getElementById("qr-section");
+    const qrReady = document.getElementById("qr-ready");
+    const qrScanning = document.getElementById("qr-scanning");
+    const qrSaveForm = document.getElementById("qr-save-form");
+    const startScanBtn = document.getElementById("start-scan-btn");
+    const scannedUsername = document.getElementById("scanned-username");
+    const notesArea = document.getElementById("notes-area");
+    const cancelSaveBtn = document.getElementById("cancel-save-btn");
+    const saveConnectionBtn = document.getElementById("save-connection-btn");
 
-        eventsData.forEach(event => {
-            const li = document.createElement("li");
-            li.className = "border border-gray-300 dark:border-gray-700 rounded-lg p-4";
+    // Toast
+    const toast = document.getElementById("toast");
 
-            const title = document.createElement("h3");
-            title.className = "font-semibold text-lg";
-            title.textContent = event.name;
-            li.appendChild(title);
+    // Config Modal
+    const configModal = document.getElementById("config-modal");
+    const blurbTextarea = document.getElementById("blurb-textarea");
+    const saveConfigBtn = document.getElementById("save-config-btn");
+    const cancelConfigBtn = document.getElementById("cancel-config-btn");
 
-            if (event.connections.length > 0) {
-                const connList = document.createElement("ul");
-                connList.className = "list-disc ml-5 mt-2 space-y-1";
+    // --- State ---
+    let html5QrCode = null;
+    let scannedUserLink = null;
+    let eventsData = loadEvents();
 
-                event.connections.forEach(conn => {
-                    const connItem = document.createElement("li");
-                    const link = document.createElement("a");
-                    link.href = conn.userLink;
-                    link.textContent = conn.userLink;
-                    link.className = "text-blue-600 dark:text-blue-400 underline mr-2";
-                    link.target = "_blank";
-
-                    connItem.appendChild(link);
-                    const noteSpan = document.createElement("span");
-                    noteSpan.textContent = `- ${conn.notes.substring(0, 60)}${conn.notes.length > 60 ? "…" : ""}`;
-                    connItem.appendChild(noteSpan);
-                    connList.appendChild(connItem);
-                });
-                li.appendChild(connList);
-            } else {
-                const empty = document.createElement("p");
-                empty.className = "text-sm text-gray-500 mt-1";
-                empty.textContent = "No connections yet.";
-                li.appendChild(empty);
-            }
-
-            eventsListEl.appendChild(li);
-        });
-
-        // Populate dropdown
-        populateEventSelect();
+    // --- Utility Functions ---
+    function showToast(msg, type = "success") {
+        if (!toast) return;
+        toast.textContent = msg;
+        toast.classList.remove("hidden");
+        toast.classList.toggle("bg-white/90", type === "success");
+        toast.classList.toggle("bg-red-500", type === "error");
+        setTimeout(() => toast.classList.add("hidden"), 2500);
     }
 
+    function isValidTMeLink(text) {
+        return /^(https?:\/\/)?t\.me\/[A-Za-z0-9_]{3,}$/i.test(text.trim());
+    }
+
+    function extractUsername(link) {
+        const match = link.match(/t\.me\/(\+?[A-Za-z0-9_]+)/i);
+        return match ? match[1] : null;
+    }
+
+    // --- Telegram Integration ---
+    function setupTelegramHeader() {
+        if (window.Telegram && Telegram.WebApp) {
+            Telegram.WebApp.ready();
+            const isDark = Telegram.WebApp.colorScheme === "dark";
+            document.documentElement.classList.toggle("dark", isDark);
+            Telegram.WebApp.onEvent("themeChanged", () => {
+                document.documentElement.classList.toggle("dark", Telegram.WebApp.colorScheme === "dark");
+            });
+            const tgUser = Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user;
+            if (tgUser && tgUserHeader) {
+                tgUserHeader.classList.remove("hidden");
+                // Avatar (fallback to initials)
+                if (tgUser.photo_url) {
+                    tgAvatar.innerHTML = `<img src="${tgUser.photo_url}" class="w-12 h-12 rounded-full" alt="Avatar">`;
+                } else {
+                    const initials = (tgUser.first_name?.[0] || "") + (tgUser.last_name?.[0] || "");
+                    tgAvatar.textContent = initials.toUpperCase() || "U";
+                }
+                tgFullname.textContent = `${tgUser.first_name || ""}${tgUser.last_name ? " " + tgUser.last_name : ""}`.trim() || tgUser.username || "Telegram User";
+                tgUsername.textContent = tgUser.username ? `@${tgUser.username}` : "";
+            }
+        }
+    }
+    setupTelegramHeader();
+
+    // --- Events Storage ---
+    function loadEvents() {
+        try {
+            const data = JSON.parse(localStorage.getItem("eventsData") || "[]");
+            return Array.isArray(data) ? data : [];
+        } catch {
+            return [];
+        }
+    }
+    function saveEvents(events) {
+        localStorage.setItem("eventsData", JSON.stringify(events));
+    }
+
+    // --- Render Events ---
+    function renderEvents() {
+        if (!eventsListEl) return;
+        eventsListEl.innerHTML = "";
+        if (!eventsData.length) {
+            const empty = document.createElement("div");
+            empty.id = "empty-events";
+            empty.className = "text-center text-white/50 py-8";
+            empty.textContent = "No events yet. Create your first event to get started!";
+            eventsListEl.appendChild(empty);
+        } else {
+            eventsData.forEach(event => {
+                const card = document.createElement("div");
+                card.className = "glass rounded-xl p-4 mb-2 border border-white/20";
+                // Event header with robot icon
+                const header = document.createElement("div");
+                header.className = "flex items-center gap-2 mb-2 justify-between";
+                header.innerHTML = `<span class='font-semibold text-lg'>${event.name}</span>`;
+                // Robot icon/button
+                const agentBtn = document.createElement('button');
+                agentBtn.className = 'flex items-center gap-1 px-2 py-1 rounded bg-gradient-to-r from-slate-700 to-slate-900 text-white text-xs hover:from-slate-800 hover:to-slate-900';
+                agentBtn.innerHTML = `<svg xmlns='http://www.w3.org/2000/svg' class='w-4 h-4 inline' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 2a7 7 0 017 7v2a7 7 0 01-7 7 7 7 0 01-7-7V9a7 7 0 017-7zm0 0v2m0 16v2m-7-7h2m10 0h2' /></svg> Talk with Agent`;
+                agentBtn.onclick = () => showToast('Agent chat coming soon!');
+                header.appendChild(agentBtn);
+                card.appendChild(header);
+                if (event.connections.length) {
+                    const connList = document.createElement("ul");
+                    connList.className = "space-y-2";
+                    event.connections.forEach(conn => {
+                        const li = document.createElement("li");
+                        li.className = "flex items-center gap-3 bg-white/5 rounded p-2";
+                        // Avatar
+                        const username = extractUsername(conn.userLink) || conn.userLink;
+                        const avatar = document.createElement('div');
+                        avatar.className = 'w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-base';
+                        avatar.style.background = stringToColor(username);
+                        avatar.textContent = getInitials(username);
+                        // User info
+                        const info = document.createElement('div');
+                        info.className = 'flex flex-col min-w-0';
+                        const nameEl = document.createElement('span');
+                        nameEl.className = 'font-semibold text-white truncate max-w-[120px]';
+                        nameEl.textContent = `@${username}`;
+                        const dateEl = document.createElement('span');
+                        dateEl.className = 'text-xs text-white/50';
+                        dateEl.textContent = new Date(conn.timestamp).toLocaleDateString();
+                        const descEl = document.createElement('span');
+                        descEl.className = 'text-white/70 text-xs truncate max-w-[160px]';
+                        descEl.textContent = conn.notes ? conn.notes.substring(0, 40) + (conn.notes.length > 40 ? '…' : '') : '';
+                        info.appendChild(nameEl);
+                        info.appendChild(dateEl);
+                        info.appendChild(descEl);
+                        // Send blurb
+                        const sendBtn = document.createElement("button");
+                        sendBtn.textContent = "Send Blurb";
+                        sendBtn.className = "ml-2 px-2 py-1 text-xs bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded hover:from-blue-700 hover:to-purple-700 transition";
+                        sendBtn.onclick = () => sendBlurb(conn.userLink);
+                        li.appendChild(avatar);
+                        li.appendChild(info);
+                        li.appendChild(sendBtn);
+                        connList.appendChild(li);
+                    });
+                    card.appendChild(connList);
+                } else {
+                    const empty = document.createElement("div");
+                    empty.className = "text-white/50 text-sm mt-2";
+                    empty.textContent = "No connections yet.";
+                    card.appendChild(empty);
+                }
+                eventsListEl.appendChild(card);
+            });
+        }
+        populateEventSelect();
+    }
     function populateEventSelect() {
         if (!eventSelectEl) return;
         eventSelectEl.innerHTML = "";
-
-        if (eventsData.length === 0) {
+        if (!eventsData.length) {
             const opt = document.createElement("option");
             opt.value = "";
             opt.textContent = "Add an event first";
@@ -242,7 +196,6 @@ domReady(function () {
             eventSelectEl.disabled = true;
             return;
         }
-
         eventSelectEl.disabled = false;
         eventsData.forEach(event => {
             const opt = document.createElement("option");
@@ -251,30 +204,24 @@ domReady(function () {
             eventSelectEl.appendChild(opt);
         });
     }
-
-    // Initial render
     renderEvents();
 
-    /* ------------------------------------------------------------------
-       Add Event Modal Logic
-    ------------------------------------------------------------------ */
+    // --- Add Event Modal ---
     function showAddEventModal() {
         if (addEventModal) addEventModal.style.display = "flex";
         if (newEventNameInput) newEventNameInput.value = "";
+        if (eventError) eventError.classList.add("hidden");
     }
-
     function hideAddEventModal() {
         if (addEventModal) addEventModal.style.display = "none";
     }
-
-    if (addEventBtn) addEventBtn.addEventListener("click", showAddEventModal);
-    if (cancelAddEventBtn) cancelAddEventBtn.addEventListener("click", hideAddEventModal);
-
+    if (addEventBtn) addEventBtn.onclick = showAddEventModal;
+    if (cancelAddEventBtn) cancelAddEventBtn.onclick = hideAddEventModal;
     if (addEventSaveBtn) {
-        addEventSaveBtn.addEventListener("click", () => {
+        addEventSaveBtn.onclick = () => {
             const name = newEventNameInput.value.trim();
             if (!name) {
-                alert("Please enter an event name");
+                if (eventError) eventError.classList.remove("hidden");
                 return;
             }
             const newEvent = { id: Date.now().toString(), name, connections: [] };
@@ -282,6 +229,305 @@ domReady(function () {
             saveEvents(eventsData);
             renderEvents();
             hideAddEventModal();
+            showToast("Event added!");
+        };
+    }
+
+    // --- Config Modal ---
+    function showConfigModal() {
+        if (configModal) configModal.style.display = "flex";
+        if (blurbTextarea) blurbTextarea.value = getBlurb();
+    }
+    function hideConfigModal() {
+        if (configModal) configModal.style.display = "none";
+    }
+    if (openConfigBtn) openConfigBtn.onclick = showConfigModal;
+    if (cancelConfigBtn) cancelConfigBtn.onclick = hideConfigModal;
+    if (saveConfigBtn) {
+        saveConfigBtn.onclick = () => {
+            localStorage.setItem("blurbMessage", blurbTextarea.value.trim());
+            showToast("Blurb saved!");
+            hideConfigModal();
+        };
+    }
+    function getBlurb() {
+        return localStorage.getItem("blurbMessage") || "";
+    }
+
+    // --- QR Code Scanning ---
+    function showQRState(state) {
+        // state: 'ready', 'scanning', 'save'
+        if (qrReady) qrReady.classList.toggle("hidden", state !== "ready");
+        if (qrScanning) qrScanning.classList.toggle("hidden", state !== "scanning");
+        if (qrSaveForm) qrSaveForm.classList.toggle("hidden", state !== "save");
+    }
+    function resetQR() {
+        showQRState("ready");
+        scannedUserLink = null;
+        if (scannedUsername) scannedUsername.textContent = "username";
+        if (notesArea) notesArea.value = "";
+        if (html5QrCode) {
+            html5QrCode.stop().then(() => html5QrCode.clear()).catch(() => {});
+            html5QrCode = null;
+        }
+    }
+
+    // --- UI Hide/Show Helpers ---
+    const mainUISections = [
+        tgUserHeader,
+        document.querySelector('.text-center.space-y-2'),
+        document.querySelector('.glass.rounded-2xl.p-6.w-full.max-w-2xl.shadow-lg'), // events card
+        qrSection
+    ];
+    function hideMainUIExceptCamera() {
+        mainUISections.forEach(el => { if (el) el.style.display = 'none'; });
+        if (qrSection) qrSection.style.display = 'block';
+        if (qrReady) qrReady.classList.add('hidden');
+        if (qrScanning) qrScanning.classList.remove('hidden');
+        if (qrSaveForm) qrSaveForm.classList.add('hidden');
+    }
+    function showMainUI() {
+        mainUISections.forEach(el => { if (el) el.style.display = ''; });
+        showQRState('ready');
+    }
+
+    // --- Telegram MainButton Integration ---
+    function setupTelegramScanButton() {
+        if (window.Telegram && Telegram.WebApp) {
+            // Hide the UI scan button
+            if (startScanBtn) startScanBtn.style.display = 'none';
+            Telegram.WebApp.MainButton.setParams({ text: 'Scan QR Code', color: '#6D28D9', text_color: '#fff', is_active: true, is_visible: true });
+            Telegram.WebApp.MainButton.show();
+            Telegram.WebApp.MainButton.onClick(() => {
+                startScanningFlow();
+            });
+        }
+    }
+    setupTelegramScanButton();
+
+    // --- Notes Modal ---
+    const notesModal = document.getElementById('notes-modal');
+    const modalUsername = document.getElementById('modal-username');
+    const modalNotes = document.getElementById('modal-notes');
+    const notesCancelBtn = document.getElementById('notes-cancel-btn');
+    const notesSaveBtn = document.getElementById('notes-save-btn');
+    const modalEventSelect = document.getElementById('modal-event-select');
+    let lastScannedUserLink = null;
+    function populateModalEventSelect() {
+        if (!modalEventSelect) return;
+        modalEventSelect.innerHTML = '';
+        if (!eventsData.length) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'Add an event first';
+            modalEventSelect.appendChild(opt);
+            modalEventSelect.disabled = true;
+            return;
+        }
+        modalEventSelect.disabled = false;
+        eventsData.forEach(event => {
+            const opt = document.createElement('option');
+            opt.value = event.id;
+            opt.textContent = event.name;
+            modalEventSelect.appendChild(opt);
         });
+    }
+    function showNotesModal(username) {
+        if (notesModal) notesModal.style.display = 'flex';
+        if (modalUsername) modalUsername.textContent = username ? `@${username}` : '';
+        if (modalNotes) modalNotes.value = '';
+        populateModalEventSelect();
+    }
+    function hideNotesModal() {
+        if (notesModal) notesModal.style.display = 'none';
+    }
+    if (notesCancelBtn) notesCancelBtn.onclick = () => {
+        hideNotesModal();
+        showMainUI();
+    };
+    if (notesSaveBtn) notesSaveBtn.onclick = () => {
+        if (!lastScannedUserLink) {
+            hideNotesModal();
+            showMainUI();
+            return;
+        }
+        const notes = modalNotes.value.trim();
+        let eventId = modalEventSelect && modalEventSelect.value;
+        if (!eventId && eventsData.length > 0) eventId = eventsData[0].id;
+        if (!eventId) {
+            showToast('Please create an event first.', 'error');
+            hideNotesModal();
+            showMainUI();
+            return;
+        }
+        const event = eventsData.find(ev => ev.id === eventId);
+        if (!event) {
+            showToast('Event not found.', 'error');
+            hideNotesModal();
+            showMainUI();
+            return;
+        }
+        event.connections.push({ userLink: lastScannedUserLink, notes, timestamp: Date.now() });
+        saveEvents(eventsData);
+        renderEvents();
+        showToast('Connection saved!');
+        hideNotesModal();
+        showMainUI();
+    };
+
+    // --- Helper: Random Avatar (GitHub style) ---
+    function stringToColor(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const c = (hash & 0x00FFFFFF)
+            .toString(16)
+            .toUpperCase();
+        return '#' + '00000'.substring(0, 6 - c.length) + c;
+    }
+    function getInitials(str) {
+        if (!str) return '?';
+        const parts = str.replace('@', '').split(/[^a-zA-Z0-9]/).filter(Boolean);
+        if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+        return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
+    }
+
+    // --- Scanning Flow ---
+    function startScanningFlow() {
+        hideMainUIExceptCamera();
+        if (html5QrCode) {
+            html5QrCode.stop().then(() => html5QrCode.clear()).catch(() => {});
+        }
+        setTimeout(() => {
+            // Remove any existing scanner divs
+            const oldScanner = document.getElementById('my-qr-reader');
+            if (oldScanner) oldScanner.remove();
+            // Create and insert scanner at the top
+            const qrDiv = document.createElement('div');
+            qrDiv.id = 'my-qr-reader';
+            if (qrScanning.firstChild) {
+                qrScanning.insertBefore(qrDiv, qrScanning.firstChild);
+            } else {
+                qrScanning.appendChild(qrDiv);
+            }
+            // Scroll scanner into view
+            qrSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            html5QrCode = new Html5Qrcode('my-qr-reader');
+            html5QrCode.start(
+                { facingMode: 'environment' },
+                { fps: 10, qrbox: 250 },
+                (decodeText) => {
+                    if (!isValidTMeLink(decodeText)) {
+                        showToast('Invalid QR Code. Expected a Telegram link.', 'error');
+                        return;
+                    }
+                    lastScannedUserLink = decodeText.trim();
+                    const username = extractUsername(lastScannedUserLink);
+                    showNotesModal(username);
+                    html5QrCode.stop().then(() => html5QrCode.clear()).catch(() => {});
+                    html5QrCode = null;
+                },
+                (err) => {}
+            ).catch(() => {
+                showToast('Camera error. Try again.', 'error');
+                showMainUI();
+            });
+        }, 400);
+    }
+
+    // --- UI Button (non-Telegram) ---
+    if (startScanBtn) {
+        startScanBtn.onclick = startScanningFlow;
+    }
+
+    if (cancelSaveBtn) cancelSaveBtn.onclick = resetQR;
+    if (saveConnectionBtn) {
+        saveConnectionBtn.onclick = () => {
+            if (!scannedUserLink || !isValidTMeLink(scannedUserLink)) {
+                showToast("No valid user scanned.", "error");
+                return;
+            }
+            const notes = notesArea.value.trim();
+            const eventId = eventSelectEl.value;
+            if (!eventId) {
+                showToast("Please select an event.", "error");
+                return;
+            }
+            const event = eventsData.find(ev => ev.id === eventId);
+            if (!event) {
+                showToast("Event not found.", "error");
+                return;
+            }
+            event.connections.push({ userLink: scannedUserLink, notes, timestamp: Date.now() });
+            saveEvents(eventsData);
+            renderEvents();
+            resetQR();
+            showToast("Connection saved!");
+        };
+    }
+    // Reset QR state on load
+    resetQR();
+
+    // --- Blurb Sending ---
+    function sendBlurb(userLink) {
+        const blurb = getBlurb();
+        if (!blurb) {
+            showToast("Please configure your blurb first in settings.", "error");
+            return;
+        }
+        if (!isValidTMeLink(userLink)) {
+            showToast("Invalid user link.", "error");
+            return;
+        }
+        const target = extractUsername(userLink);
+        if (!target) {
+            showToast("Invalid user link.", "error");
+            return;
+        }
+        let url;
+        if (window.Telegram && Telegram.WebApp) {
+            url = `tg://resolve?domain=${target}&text=${encodeURIComponent(blurb)}`;
+            Telegram.WebApp.openTelegramLink(url);
+        } else {
+            url = `https://t.me/${target}?text=${encodeURIComponent(blurb)}`;
+            window.open(url, "_blank");
+        }
+    }
+
+    // --- Show user's own QR code in the UI ---
+    function showOwnQRCode() {
+        const qrDiv = document.getElementById('my-qr-code');
+        if (!qrDiv) return;
+        if (window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user && Telegram.WebApp.initDataUnsafe.user.username) {
+            const username = Telegram.WebApp.initDataUnsafe.user.username;
+            const url = `https://t.me/${username}`;
+            // Use QRCode.js if available
+            if (window.QRCode) {
+                qrDiv.innerHTML = '';
+                new QRCode(qrDiv, {
+                    text: url,
+                    width: 128,
+                    height: 128,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+            } else {
+                // Fallback: simple SVG
+                qrDiv.innerHTML = `<a href='${url}' target='_blank' class='block'><svg width='128' height='128'><rect width='128' height='128' fill='#eee'/><text x='50%' y='50%' text-anchor='middle' fill='#333' dy='.3em'>QR</text></svg></a>`;
+            }
+        } else {
+            qrDiv.innerHTML = '<div class="text-white/50">Login with Telegram to get your QR code.</div>';
+        }
+    }
+    // Load QRCode.js if not present
+    if (!window.QRCode) {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+        script.onload = showOwnQRCode;
+        document.body.appendChild(script);
+    } else {
+        showOwnQRCode();
     }
 });

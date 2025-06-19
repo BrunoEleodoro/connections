@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Configurations</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = { darkMode: 'class' };
+    </script>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4 overflow-x-hidden">
+    <h1 class="text-3xl font-bold mb-6">Configurations</h1>
+    <div class="w-full max-w-lg">
+        <label for="blurb-text" class="block mb-2 font-medium text-gray-700 dark:text-gray-300">Blurb message</label>
+        <textarea id="blurb-text" rows="6" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-3 resize-y"></textarea>
+        <button id="save-blurb-btn" class="mt-4 px-6 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 active:bg-emerald-700 transition">Save</button>
+    </div>
+    <a href="index.html" class="mt-6 text-blue-600 dark:text-blue-400 underline">← Back to Home</a>
+
+    <script>
+      const STORAGE_KEY = 'blurbMessage';
+      const textarea = document.getElementById('blurb-text');
+      const saveBtn = document.getElementById('save-blurb-btn');
+
+      // Load existing blurb
+      textarea.value = localStorage.getItem(STORAGE_KEY) || '';
+
+      saveBtn.addEventListener('click', () => {
+        localStorage.setItem(STORAGE_KEY, textarea.value.trim());
+        alert('Blurb saved!');
+      });
+    </script>
+</body>
+</html> 
