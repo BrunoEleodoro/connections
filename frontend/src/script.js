@@ -70,10 +70,22 @@ domReady(function () {
         const notes = notesArea.value.trim();
         const scannedText = scannedValueEl.textContent.replace("Scanned: ", "");
 
-        // Persist to localStorage (simple demo)
-        const stored = JSON.parse(localStorage.getItem("connections") || "[]");
-        stored.push({ scannedText, notes, timestamp: Date.now() });
-        localStorage.setItem("connections", JSON.stringify(stored));
+        // Save connection to selected event
+        const selectedEventId = eventSelectEl.value;
+        if (!selectedEventId) {
+            alert("Please create an event first and select it.");
+            return;
+        }
+
+        const selectedEvent = eventsData.find(ev => ev.id === selectedEventId);
+        if (!selectedEvent) {
+            alert("Selected event not found.");
+            return;
+        }
+
+        selectedEvent.connections.push({ userLink: scannedText, notes, timestamp: Date.now() });
+        saveEvents(eventsData);
+        renderEvents();
 
         // Reset UI to homepage state
         resultSection.style.display = "none";
@@ -134,5 +146,142 @@ domReady(function () {
             // Hide old paragraph if present
             if (userInfoEl) userInfoEl.style.display = "none";
         }
+    }
+
+    /* ------------------------------------------------------------------
+       Events & Connections storage helpers
+    ------------------------------------------------------------------ */
+    const STORAGE_KEY_EVENTS = "eventsData";
+
+    function loadEvents() {
+        try {
+            const data = JSON.parse(localStorage.getItem(STORAGE_KEY_EVENTS) || "[]");
+            return Array.isArray(data) ? data : [];
+        } catch (e) {
+            console.error("Failed to parse events from storage", e);
+            return [];
+        }
+    }
+
+    function saveEvents(events) {
+        localStorage.setItem(STORAGE_KEY_EVENTS, JSON.stringify(events));
+    }
+
+    let eventsData = loadEvents();
+
+    /* ------------------------------------------------------------------
+       DOM references for Events UI
+    ------------------------------------------------------------------ */
+    const eventsListEl = document.getElementById("events-list");
+    const addEventBtn = document.getElementById("add-event-btn");
+    const addEventModal = document.getElementById("add-event-modal");
+    const newEventNameInput = document.getElementById("new-event-name");
+    const addEventSaveBtn = document.getElementById("add-event-save-btn");
+    const cancelAddEventBtn = document.getElementById("cancel-add-event");
+    const eventSelectEl = document.getElementById("event-select");
+
+    /* ------------------------------------------------------------------
+       Rendering helpers
+    ------------------------------------------------------------------ */
+    function renderEvents() {
+        // Update list on homepage
+        if (!eventsListEl) return;
+        eventsListEl.innerHTML = "";
+
+        eventsData.forEach(event => {
+            const li = document.createElement("li");
+            li.className = "border border-gray-300 dark:border-gray-700 rounded-lg p-4";
+
+            const title = document.createElement("h3");
+            title.className = "font-semibold text-lg";
+            title.textContent = event.name;
+            li.appendChild(title);
+
+            if (event.connections.length > 0) {
+                const connList = document.createElement("ul");
+                connList.className = "list-disc ml-5 mt-2 space-y-1";
+
+                event.connections.forEach(conn => {
+                    const connItem = document.createElement("li");
+                    const link = document.createElement("a");
+                    link.href = conn.userLink;
+                    link.textContent = conn.userLink;
+                    link.className = "text-blue-600 dark:text-blue-400 underline mr-2";
+                    link.target = "_blank";
+
+                    connItem.appendChild(link);
+                    const noteSpan = document.createElement("span");
+                    noteSpan.textContent = `- ${conn.notes.substring(0, 60)}${conn.notes.length > 60 ? "…" : ""}`;
+                    connItem.appendChild(noteSpan);
+                    connList.appendChild(connItem);
+                });
+                li.appendChild(connList);
+            } else {
+                const empty = document.createElement("p");
+                empty.className = "text-sm text-gray-500 mt-1";
+                empty.textContent = "No connections yet.";
+                li.appendChild(empty);
+            }
+
+            eventsListEl.appendChild(li);
+        });
+
+        // Populate dropdown
+        populateEventSelect();
+    }
+
+    function populateEventSelect() {
+        if (!eventSelectEl) return;
+        eventSelectEl.innerHTML = "";
+
+        if (eventsData.length === 0) {
+            const opt = document.createElement("option");
+            opt.value = "";
+            opt.textContent = "Add an event first";
+            eventSelectEl.appendChild(opt);
+            eventSelectEl.disabled = true;
+            return;
+        }
+
+        eventSelectEl.disabled = false;
+        eventsData.forEach(event => {
+            const opt = document.createElement("option");
+            opt.value = event.id;
+            opt.textContent = event.name;
+            eventSelectEl.appendChild(opt);
+        });
+    }
+
+    // Initial render
+    renderEvents();
+
+    /* ------------------------------------------------------------------
+       Add Event Modal Logic
+    ------------------------------------------------------------------ */
+    function showAddEventModal() {
+        if (addEventModal) addEventModal.style.display = "flex";
+        if (newEventNameInput) newEventNameInput.value = "";
+    }
+
+    function hideAddEventModal() {
+        if (addEventModal) addEventModal.style.display = "none";
+    }
+
+    if (addEventBtn) addEventBtn.addEventListener("click", showAddEventModal);
+    if (cancelAddEventBtn) cancelAddEventBtn.addEventListener("click", hideAddEventModal);
+
+    if (addEventSaveBtn) {
+        addEventSaveBtn.addEventListener("click", () => {
+            const name = newEventNameInput.value.trim();
+            if (!name) {
+                alert("Please enter an event name");
+                return;
+            }
+            const newEvent = { id: Date.now().toString(), name, connections: [] };
+            eventsData.push(newEvent);
+            saveEvents(eventsData);
+            renderEvents();
+            hideAddEventModal();
+        });
     }
 });
