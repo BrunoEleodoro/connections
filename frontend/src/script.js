@@ -122,10 +122,10 @@ domReady(function () {
             empty.textContent = "No events yet. Create your first event to get started!";
             eventsListEl.appendChild(empty);
         } else {
-            eventsData.forEach(event => {
+            eventsData.forEach((event, eventIdx) => {
                 const card = document.createElement("div");
-                card.className = "glass rounded-xl p-4 mb-2 border border-white/20";
-                // Event header with robot icon
+                card.className = "rounded-xl mb-2 bg-transparent";
+                // Event header with robot icon and delete button
                 const header = document.createElement("div");
                 header.className = "flex items-center gap-2 mb-2 justify-between";
                 header.innerHTML = `<span class='font-semibold text-lg'>${event.name}</span>`;
@@ -135,13 +135,26 @@ domReady(function () {
                 agentBtn.innerHTML = `<svg xmlns='http://www.w3.org/2000/svg' class='w-4 h-4 inline' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 2a7 7 0 017 7v2a7 7 0 01-7 7 7 7 0 01-7-7V9a7 7 0 017-7zm0 0v2m0 16v2m-7-7h2m10 0h2' /></svg> Talk with Agent`;
                 agentBtn.onclick = () => showToast('Agent chat coming soon!');
                 header.appendChild(agentBtn);
+                // Delete event button
+                const deleteEventBtn = document.createElement('button');
+                deleteEventBtn.className = 'ml-2 px-2 py-1 rounded bg-red-600/80 text-white text-xs hover:bg-red-700';
+                deleteEventBtn.innerHTML = `<svg xmlns='http://www.w3.org/2000/svg' class='w-4 h-4 inline' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 18L18 6M6 6l12 12' /></svg>`;
+                deleteEventBtn.onclick = () => {
+                    if (confirm(`Delete event '${event.name}'? This cannot be undone.`)) {
+                        eventsData.splice(eventIdx, 1);
+                        saveEvents(eventsData);
+                        renderEvents();
+                        showToast('Event deleted!');
+                    }
+                };
+                header.appendChild(deleteEventBtn);
                 card.appendChild(header);
                 if (event.connections.length) {
                     const connList = document.createElement("ul");
                     connList.className = "space-y-2";
-                    event.connections.forEach(conn => {
+                    event.connections.forEach((conn, connIdx) => {
                         const li = document.createElement("li");
-                        li.className = "flex items-center gap-3 bg-white/5 rounded p-2";
+                        li.className = "flex items-center gap-3 bg-white/5 rounded p-2 cursor-pointer hover:bg-white/10 transition";
                         // Avatar
                         const username = extractUsername(conn.userLink) || conn.userLink;
                         const avatar = document.createElement('div');
@@ -163,14 +176,27 @@ domReady(function () {
                         info.appendChild(nameEl);
                         info.appendChild(dateEl);
                         info.appendChild(descEl);
-                        // Send blurb
-                        const sendBtn = document.createElement("button");
-                        sendBtn.textContent = "Send Blurb";
-                        sendBtn.className = "ml-2 px-2 py-1 text-xs bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded hover:from-blue-700 hover:to-purple-700 transition";
-                        sendBtn.onclick = () => sendBlurb(conn.userLink);
+                        // Remove user button
+                        const removeUserBtn = document.createElement('button');
+                        removeUserBtn.className = 'ml-auto px-2 py-1 rounded bg-red-500/80 text-white text-xs hover:bg-red-600';
+                        removeUserBtn.innerHTML = `<svg xmlns='http://www.w3.org/2000/svg' class='w-4 h-4 inline' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 18L18 6M6 6l12 12' /></svg>`;
+                        removeUserBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            if (confirm(`Remove @${username} from event '${event.name}'?`)) {
+                                event.connections.splice(connIdx, 1);
+                                saveEvents(eventsData);
+                                renderEvents();
+                                showToast('User removed from event!');
+                            }
+                        };
+                        // Make row clickable to Telegram URL
+                        li.onclick = () => {
+                            const url = `https://t.me/${username}`;
+                            window.open(url, '_blank');
+                        };
                         li.appendChild(avatar);
                         li.appendChild(info);
-                        li.appendChild(sendBtn);
+                        li.appendChild(removeUserBtn);
                         connList.appendChild(li);
                     });
                     card.appendChild(connList);
